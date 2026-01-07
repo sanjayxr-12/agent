@@ -1,40 +1,48 @@
-from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from app.agent.state import AgentState
 from app.agent.tools import list_tables, execute_sql 
 from app.utils.gemini_client import get_chat_model
+from app.template.agent_prompt_template import guardrails_template, agent_template 
 
 llm = get_chat_model() 
 llm_with_tools = llm.bind_tools([list_tables, execute_sql])
 
+async def guardrails_node(state: AgentState) -> AgentState:
+    question = state["question"]
+
+    chain = guardrails_template | llm
+
+    response = await chain.ainvoke({"question": question})
+    content = response.content.strip().upper()
+
+    if "UNSAFE" in content:
+        return {
+            "messages": [AIMessage(content="I cannot process this request as it violates our safety guidelines.")],
+            "answer": "Safety Violation: Request blocked.",
+            "is_unsafe": True 
+        }
+    
+    return {"is_unsafe": False}
+
 async def agent_node(state: AgentState) -> AgentState:
     messages = state.get("messages", [])
-    question = state["question"]
-    
-    if not messages:
-        print("DEBUG: Fetching schema for System Prompt...")
-        schema_context = await list_tables.ainvoke({})  
-        system_prompt = (
-            "You are a MySQL Expert. "
-            "Use the provided tools to answer the user's question. "
-            "NEVER guess column names. Always refer to the schema below.\n\n"
-            "### DATABASE SCHEMA ###\n"
-            f"{schema_context}"
-        )
-        
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=question)
-        ]
 
-    response = await llm_with_tools.ainvoke(messages)
+    schema_context = await list_tables.ainvoke({})
+
+    chain = agent_template | llm_with_tools
     
-    return {"messages": messages + [response]}
+    response = await chain.ainvoke({
+        "schema": schema_context,
+        "messages": messages
+    })
+
+    return {"messages": [response]}
 
 async def tools_node(state: AgentState) -> AgentState:
     last_message = state["messages"][-1]
     
     if not last_message.tool_calls:
-        return state 
+        return {"messages": []} 
     
     results = []
     
@@ -56,5 +64,5 @@ async def tools_node(state: AgentState) -> AgentState:
             output = f"Tool Execution Error: {str(e)}"
             
         results.append(ToolMessage(content=str(output), tool_call_id=tool_call_id))
-    
-    return {"messages": state["messages"] + results}
+
+    return {"messages": results}

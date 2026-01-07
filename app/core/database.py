@@ -1,28 +1,35 @@
 import os
 from typing import Optional
-
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
+class MongoSingleton:
+    _instance: Optional[AsyncIOMotorClient] = None
+    _db_name = os.getenv("MONGODB_DB_NAME", "policy")
+    _url = os.getenv("MONGODB_URL")
 
-MONGODB_URL = os.getenv("MONGODB_URL")
-MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "policy")
+    @classmethod
+    def get_client(cls) -> AsyncIOMotorClient:
+        if cls._instance is None:
+            if not cls._url:
+                raise RuntimeError("MONGODB_URL not configured")
+            cls._instance = AsyncIOMotorClient(cls._url)
+            print("INFO: New MongoDB Client created.")
+        return cls._instance
 
-_client: Optional[AsyncIOMotorClient] = None
+    @classmethod
+    async def get_database(cls) -> AsyncIOMotorDatabase:
+        client = cls.get_client()
+        return client[cls._db_name]
 
+    @classmethod
+    def close(cls):
+        if cls._instance:
+            cls._instance.close()
+            cls._instance = None
+            print("INFO: MongoDB Client closed.")
 
 async def get_database() -> AsyncIOMotorDatabase:
-    global _client
-    if not MONGODB_URL:
-        raise RuntimeError("MONGODB_URL not configured")
+    return await MongoSingleton.get_database()
 
-    if _client is None:
-        _client = AsyncIOMotorClient(MONGODB_URL)
-    return _client[MONGODB_DB_NAME]
-
-
-async def close_database_client() -> None:
-    global _client
-    if _client is not None:
-        _client.close()
-        _client = None
-
+async def close_database_client():
+    MongoSingleton.close()
