@@ -1,0 +1,11 @@
+fastapi
+pydantic
+python-dotenv
+sqlalchemy
+aiomysql
+motor
+langgraph
+langchain-core
+langchain-groq
+typing-extensions
+uvicorn
