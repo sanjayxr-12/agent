@@ -82,8 +82,22 @@ def get_chat_model(model_name: str = DEFAULT_MODEL):
         api_key=api_key,
         temperature=0,
         max_retries=2,
-        request_timeout=30 
+        request_timeout=30,
     )
+
+def get_gaurd_model(model_name:str = DEFAULT_MODEL):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY not configured")
+        
+    return ChatGroq(
+        model=model_name,
+        api_key=api_key,
+        temperature=0,
+        max_retries=2,
+        request_timeout=30,
+        streaming = False,
+    )  
 
 async def generate_text(prompt: str):
     model = get_chat_model()
