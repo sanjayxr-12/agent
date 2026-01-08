@@ -11,3 +11,4 @@ typing-extensions
 uvicorn
 langgraph-checkpoint-redis 
 redis
+cryptography

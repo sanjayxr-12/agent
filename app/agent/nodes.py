@@ -12,7 +12,7 @@ async def guardrails_node(state: AgentState) -> AgentState:
 
     chain = guardrails_template | llm
 
-    response = await chain.ainvoke({"question": question})
+    response = await chain.ainvoke({"question": question}, config={"tags":["private"]})
     content = response.content.strip().upper()
 
     if "UNSAFE" in content:
@@ -34,7 +34,7 @@ async def agent_node(state: AgentState) -> AgentState:
     response = await chain.ainvoke({
         "schema": schema_context,
         "messages": messages
-    })
+    }, config={"tags":["visible_to_users"]})
 
     return {"messages": [response]}
 
