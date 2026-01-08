@@ -9,3 +9,5 @@ langchain-core
 langchain-groq
 typing-extensions
 uvicorn
+langgraph-checkpoint-redis 
+redis
