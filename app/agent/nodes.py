@@ -1,23 +1,26 @@
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from app.agent.state import AgentState
 from app.agent.tools import list_tables, execute_sql 
-from app.utils.gemini_client import get_chat_model
+from app.utils.gemini_client import get_chat_model, get_gaurd_model
 from app.template.agent_prompt_template import guardrails_template, agent_template 
+from app.agent.schemas import SafetyAssessment
 
-llm = get_chat_model() 
+llm = get_chat_model()
+guard_llm = get_gaurd_model() 
 llm_with_tools = llm.bind_tools([list_tables, execute_sql])
 
 async def guardrails_node(state: AgentState) -> AgentState:
     question = state["question"]
 
-    chain = guardrails_template | llm
+    structured_llm = guard_llm.with_structured_output(SafetyAssessment)
+    
+    chain = guardrails_template | structured_llm
 
-    response = await chain.ainvoke({"question": question}, config={"tags":["private"]})
-    content = response.content.strip().upper()
+    assessment: SafetyAssessment = await chain.ainvoke({"question": question})
 
-    if "UNSAFE" in content:
+    if not assessment.is_safe:
         return {
-            "messages": [AIMessage(content="I cannot process this request as it violates our safety guidelines.")],
+            "messages": [AIMessage(content=f"Safety Violation: {assessment.reason}")],
             "answer": "Safety Violation: Request blocked.",
             "is_unsafe": True 
         }
@@ -66,3 +69,6 @@ async def tools_node(state: AgentState) -> AgentState:
         results.append(ToolMessage(content=str(output), tool_call_id=tool_call_id))
 
     return {"messages": results}
+
+def rejection_node(state):
+    return {"messages": [AIMessage(content="I cannot answer that as it violates my safety policy.")]}

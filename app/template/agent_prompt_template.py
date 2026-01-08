@@ -2,9 +2,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 guardrails_template = ChatPromptTemplate.from_messages([
     ("system", (
-        "You are a content safety filter. Analyze the following user message. "
-        "If it contains hate speech, violence, sexual content, or malicious intent, respond strictly with 'UNSAFE'. "
-        "If it is a normal query (even if it's about database/SQL), respond with 'SAFE'."
+        "You are a content safety filter. Analyze the incoming user message."
+        "Determine if it contains hate speech, violence, sexual content, or malicious SQL injection intent."
     )),
     ("human", "{question}"),
 ])

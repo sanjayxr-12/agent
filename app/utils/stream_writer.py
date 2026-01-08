@@ -1,5 +1,5 @@
 import json
-from langchain_core.messages import AIMessageChunk
+from langchain_core.messages import AIMessageChunk, AIMessage
 
 async def run_agent_stream(graph, input_state, config, thread_id):
     try:
@@ -40,6 +40,13 @@ async def run_agent_stream(graph, input_state, config, thread_id):
                         "content": f"{tool_name} completed."
                     }
                     yield f"data: {json.dumps(payload)}\n\n"
+
+            elif event["event"] == "on_chain_end" and event["name"] == "rejection":
+                messages = event["data"]["output"].get("messages", [])
+                if messages:
+                    last_message = messages[-1]
+                    if isinstance(last_message, AIMessage):
+                        yield json.dumps({"type": "token", "content": last_message.content})        
 
     except Exception as e:
         error_payload = {
